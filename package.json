@@ -1,0 +1,23 @@
+{
+  "name": "@alshival.ai/alshival",
+  "version": "0.1.0",
+  "description": "Alshival client SDK for Node.js",
+  "main": "src/index.js",
+  "type": "commonjs",
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node --test tests/*.test.js"
+  },
+  "keywords": [
+    "alshival",
+    "logging",
+    "sdk",
+    "mcp"
+  ],
+  "license": "MIT"
+}
