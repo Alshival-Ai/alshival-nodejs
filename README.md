@@ -17,7 +17,7 @@ Create an API key in Alshival (`Account Settings` -> `API Keys`) and set environ
 - `ALSHIVAL_API_KEY`
 - `ALSHIVAL_BASE_URL` (optional, defaults to `https://alshival.dev` when `ALSHIVAL_RESOURCE` is not set)
 - `ALSHIVAL_PORTAL_PREFIX` (optional; override DevTools path prefix, for example `""` or `/DevTools`)
-- `ALSHIVAL_CLOUD_LEVEL` (optional, defaults to `INFO`; minimum level forwarded to Alshival Cloud Logs)
+- `ALSHIVAL_CLOUD_LEVEL` (optional, defaults to `INFO`; minimum level forwarded to Alshival Cloud Logs: `DEBUG`, `INFO`, `WARNING`, `ERROR`, `ALERT`, `NONE`)
 - `ALSHIVAL_DEBUG` (optional, `true/false`; enables SDK diagnostics and defaults cloud forwarding to `DEBUG` unless `ALSHIVAL_CLOUD_LEVEL` is set)
 
 ```js
@@ -30,8 +30,8 @@ alshival.log.info('service started');
 
 `ALSHIVAL_CLOUD_LEVEL` (or `configure({ cloudLevel: ... })`) controls what gets forwarded to Alshival Cloud Logs.
 
-Accepted thresholds: `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`, `ALERT`, `ALERTS`.
-Disable cloud forwarding with `false`/`none` (also accepts `off`/`disabled`, case-insensitive).
+Accepted values: `DEBUG`, `INFO`, `WARNING`, `ERROR`, `ALERT`, `NONE`.
+Use `NONE` to disable cloud forwarding.
 
 ```js
 const alshival = require('@alshival.ai/alshival');
@@ -50,17 +50,17 @@ alshival.log.error('sent to cloud');
 Disable cloud forwarding explicitly:
 
 ```env
-ALSHIVAL_CLOUD_LEVEL=false
+ALSHIVAL_CLOUD_LEVEL=NONE
 ```
 
 ```js
-alshival.configure({ cloudLevel: false }); // equivalent: cloudLevel: 'none'
+alshival.configure({ cloudLevel: 'NONE' });
 ```
 
 To forward only alert events:
 
 ```env
-ALSHIVAL_CLOUD_LEVEL=ALERTS
+ALSHIVAL_CLOUD_LEVEL=ALERT
 ```
 
 ## Direct SDK Logging

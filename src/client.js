@@ -7,6 +7,13 @@ const ALERT_LEVEL = 45;
 const DEFAULT_BASE_URL = 'https://alshival.dev';
 const TRUE_ENV_VALUES = new Set(['1', 'true', 't', 'yes', 'y', 'on']);
 const DISABLED_LEVEL_VALUES = new Set(['NONE', 'NULL', 'FALSE', 'OFF', 'DISABLE', 'DISABLED']);
+const CLOUD_LEVEL_NAME_TO_NO = {
+  ALERT: ALERT_LEVEL,
+  ERROR: 40,
+  WARNING: 30,
+  INFO: 20,
+  DEBUG: 10,
+};
 
 const LEVEL_NAME_TO_NO = {
   ALERT: ALERT_LEVEL,
@@ -64,6 +71,20 @@ function coerceLevel(level) {
   throw new Error(`Invalid log level: ${JSON.stringify(level)}`);
 }
 
+function coerceCloudLevel(level) {
+  if (typeof level !== 'string') {
+    throw new Error(`Invalid log level: ${JSON.stringify(level)}`);
+  }
+  const name = String(level).trim().toUpperCase();
+  if (name === 'NONE') {
+    return null;
+  }
+  if (Object.prototype.hasOwnProperty.call(CLOUD_LEVEL_NAME_TO_NO, name)) {
+    return CLOUD_LEVEL_NAME_TO_NO[name];
+  }
+  throw new Error(`Invalid log level: ${JSON.stringify(level)}`);
+}
+
 function envLevel(name, defaultValue) {
   const value = process.env[name];
   if (value === undefined || String(value).trim() === '') {
@@ -71,6 +92,18 @@ function envLevel(name, defaultValue) {
   }
   try {
     return coerceLevel(value);
+  } catch {
+    return defaultValue;
+  }
+}
+
+function envCloudLevel(name, defaultValue) {
+  const value = process.env[name];
+  if (value === undefined || String(value).trim() === '') {
+    return defaultValue;
+  }
+  try {
+    return coerceCloudLevel(value);
   } catch {
     return defaultValue;
   }
@@ -143,7 +176,7 @@ function buildClientConfigFromEnv() {
     portalPrefix,
     resourceId: resourceEnv ? resourceEnv.resourceId : null,
     enabled: true,
-    cloudLevel: envLevel('ALSHIVAL_CLOUD_LEVEL', defaultCloudLevel),
+    cloudLevel: envCloudLevel('ALSHIVAL_CLOUD_LEVEL', defaultCloudLevel),
     timeoutSeconds: 5,
     verifySsl: true,
     debug: debugEnv,
@@ -208,7 +241,7 @@ function configure(options = {}) {
     const cloudLevelValue = Object.prototype.hasOwnProperty.call(options, 'cloudLevel')
       ? options.cloudLevel
       : options.cloud_level;
-    _config.cloudLevel = coerceLevel(cloudLevelValue);
+    _config.cloudLevel = coerceCloudLevel(cloudLevelValue);
   } else if (debug === true && _config.cloudLevel !== null) {
     // In SDK debug mode, prefer forwarding debug-level events unless caller explicitly sets cloudLevel.
     _config.cloudLevel = LEVEL_NAME_TO_NO.DEBUG;
@@ -293,6 +326,7 @@ module.exports = {
   buildClientConfigFromEnv,
   buildResourceLogsEndpoint,
   coerceLevel,
+  coerceCloudLevel,
   configure,
   envBool,
   envLevel,

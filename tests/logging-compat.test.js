@@ -92,7 +92,7 @@ test('cloud level disable token skips forwarding', async () => {
     apiKey: 'k',
     resource: 'https://alshival.dev/u/u/resources/r/',
     enabled: true,
-    cloudLevel: 'false',
+    cloudLevel: 'NONE',
   });
 
   await withTransportCapture(async (calls) => {
@@ -107,7 +107,7 @@ test('configure supports snake_case cloud_level disable token', async () => {
     api_key: 'k',
     resource: 'https://alshival.dev/u/u/resources/r/',
     enabled: true,
-    cloud_level: 'none',
+    cloud_level: 'NONE',
   });
 
   await withTransportCapture(async (calls) => {
@@ -116,20 +116,23 @@ test('configure supports snake_case cloud_level disable token', async () => {
   });
 });
 
-test('env cloud level disable tokens parse as disabled', () => {
-  const cfgFalse = withEnv({ ALSHIVAL_CLOUD_LEVEL: 'false' }, () => alshival.buildClientConfigFromEnv());
-  const cfgNone = withEnv({ ALSHIVAL_CLOUD_LEVEL: 'None' }, () => alshival.buildClientConfigFromEnv());
-  assert.equal(cfgFalse.cloudLevel, null);
+test('env cloud level NONE token parses as disabled', () => {
+  const cfgNone = withEnv({ ALSHIVAL_CLOUD_LEVEL: 'NONE' }, () => alshival.buildClientConfigFromEnv());
   assert.equal(cfgNone.cloudLevel, null);
 });
 
-test('alert levels alias and tag supported', async () => {
+test('env cloud level invalid value falls back to default', () => {
+  const cfgInvalid = withEnv({ ALSHIVAL_CLOUD_LEVEL: 'false' }, () => alshival.buildClientConfigFromEnv());
+  assert.equal(cfgInvalid.cloudLevel, 20);
+});
+
+test('alert level and tag supported', async () => {
   alshival.configure({
     username: 'u',
     apiKey: 'k',
     resource: 'https://alshival.dev/u/u/resources/r/',
     enabled: true,
-    cloudLevel: 'ALERTS',
+    cloudLevel: 'ALERT',
   });
 
   await withTransportCapture(async (calls) => {
@@ -143,6 +146,13 @@ test('alert levels alias and tag supported', async () => {
     assert.equal(logs.length > 0, true);
     assert.equal(String(logs[0].level || ''), 'alert');
   });
+});
+
+test('configure cloudLevel rejects non-string values', () => {
+  assert.throws(
+    () => alshival.configure({ cloudLevel: false }),
+    /Invalid log level/,
+  );
 });
 
 test('shared resource uses owner path with actor headers', async () => {
