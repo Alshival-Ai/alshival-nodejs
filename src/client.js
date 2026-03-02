@@ -4,8 +4,6 @@ const { URL } = require('node:url');
 
 const ALERT_LEVEL = 45;
 
-const DEFAULT_BASE_URL = 'https://alshival.dev';
-const TRUE_ENV_VALUES = new Set(['1', 'true', 't', 'yes', 'y', 'on']);
 const DISABLED_LEVEL_VALUES = new Set(['NONE', 'NULL', 'FALSE', 'OFF', 'DISABLE', 'DISABLED']);
 const CLOUD_LEVEL_NAME_TO_NO = {
   ALERT: ALERT_LEVEL,
@@ -27,26 +25,6 @@ const LEVEL_NAME_TO_NO = {
   DEBUG: 10,
   NOTSET: 0,
 };
-
-function envBool(name, defaultValue = false) {
-  const value = process.env[name];
-  if (value === undefined) {
-    return defaultValue;
-  }
-  return TRUE_ENV_VALUES.has(String(value).trim().toLowerCase());
-}
-
-function normalizePortalPrefix(value) {
-  if (value === undefined || value === null) {
-    return null;
-  }
-  const raw = String(value).trim();
-  if (!raw) {
-    return '';
-  }
-  const cleaned = `/${raw.replace(/^\/+|\/+$/g, '')}`;
-  return cleaned === '/' ? '' : cleaned;
-}
 
 function coerceLevel(level) {
   if (level === null) {
@@ -126,60 +104,55 @@ function parseResourceReference(resource) {
   }
 
   let segments = parsed.pathname.split('/').filter(Boolean);
-  if (segments.length > 0 && segments[segments.length - 1].toLowerCase() === 'logs') {
+  if (segments.length > 0 && String(segments[segments.length - 1]).trim().toLowerCase() === 'logs') {
     segments = segments.slice(0, -1);
   }
 
-  let owner = '';
+  let resourceLogsPrefix = '';
   let resourceId = '';
-  let prefixSegments = [];
-
-  for (let index = 0; index <= segments.length - 4; index += 1) {
-    if (segments[index] === 'u' && segments[index + 2] === 'resources') {
-      owner = decodeURIComponent(segments[index + 1] || '').trim();
-      resourceId = decodeURIComponent(segments[index + 3] || '').trim();
-      prefixSegments = segments.slice(0, index);
+  for (let index = 0; index < segments.length; index += 1) {
+    if (String(segments[index]).trim().toLowerCase() === 'resources' && index + 1 < segments.length) {
+      resourceId = decodeURIComponent(segments[index + 1] || '').trim();
+      if (!resourceId) {
+        return null;
+      }
+      resourceLogsPrefix = `/${segments.slice(0, index + 1).join('/')}`;
+      if (resourceLogsPrefix === '/') {
+        resourceLogsPrefix = '';
+      }
       break;
     }
   }
 
-  if (!owner || !resourceId) {
+  if (!resourceLogsPrefix || !resourceId) {
     return null;
   }
 
-  let portalPrefix = prefixSegments.length ? `/${prefixSegments.join('/')}` : '';
-  if (portalPrefix === '/') {
-    portalPrefix = '';
-  }
-
   return {
-    baseUrl: `${parsed.protocol}//${parsed.host}`.replace(/\/$/, ''),
-    portalPrefix,
-    resourceOwnerUsername: owner,
+    resourceBaseUrl: `${parsed.protocol}//${parsed.host}`.replace(/\/$/, ''),
+    resourceLogsPrefix,
     resourceId,
   };
 }
 
 function buildClientConfigFromEnv() {
   const resourceEnv = parseResourceReference(process.env.ALSHIVAL_RESOURCE || process.env.ALSHIVAL_RESOURCE_URL);
-  const debugEnv = envBool('ALSHIVAL_DEBUG', false);
-  const defaultCloudLevel = debugEnv ? LEVEL_NAME_TO_NO.DEBUG : LEVEL_NAME_TO_NO.INFO;
+  const defaultCloudLevel = LEVEL_NAME_TO_NO.INFO;
 
-  const baseUrl = resourceEnv ? resourceEnv.baseUrl : (process.env.ALSHIVAL_BASE_URL || DEFAULT_BASE_URL);
-  const portalPrefix = resourceEnv ? resourceEnv.portalPrefix : normalizePortalPrefix(process.env.ALSHIVAL_PORTAL_PREFIX);
+  const resourceBaseUrl = resourceEnv ? resourceEnv.resourceBaseUrl : null;
+  const resourceLogsPrefix = resourceEnv ? resourceEnv.resourceLogsPrefix : null;
+  const resourceId = resourceEnv ? resourceEnv.resourceId : null;
 
   return {
     username: process.env.ALSHIVAL_USERNAME || null,
-    resourceOwnerUsername: resourceEnv ? resourceEnv.resourceOwnerUsername : null,
+    resourceBaseUrl,
+    resourceLogsPrefix,
     apiKey: process.env.ALSHIVAL_API_KEY || null,
-    baseUrl: String(baseUrl).replace(/\/$/, ''),
-    portalPrefix,
-    resourceId: resourceEnv ? resourceEnv.resourceId : null,
+    resourceId,
     enabled: true,
     cloudLevel: envCloudLevel('ALSHIVAL_CLOUD_LEVEL', defaultCloudLevel),
     timeoutSeconds: 5,
     verifySsl: true,
-    debug: debugEnv,
   };
 }
 
@@ -189,30 +162,21 @@ function configure(options = {}) {
   const username = options.username;
   const resource = options.resource;
   const apiKey = Object.prototype.hasOwnProperty.call(options, 'apiKey') ? options.apiKey : options.api_key;
-  const baseUrl = Object.prototype.hasOwnProperty.call(options, 'baseUrl') ? options.baseUrl : options.base_url;
-  const portalPrefix = Object.prototype.hasOwnProperty.call(options, 'portalPrefix')
-    ? options.portalPrefix
-    : options.portal_prefix;
   const enabled = options.enabled;
   const timeoutSeconds = Object.prototype.hasOwnProperty.call(options, 'timeoutSeconds')
     ? options.timeoutSeconds
     : options.timeout_seconds;
   const verifySsl = Object.prototype.hasOwnProperty.call(options, 'verifySsl') ? options.verifySsl : options.verify_ssl;
-  const debug = options.debug;
 
   if (resource !== undefined) {
     const parsedResource = parseResourceReference(resource);
     if (parsedResource) {
-      if (baseUrl === undefined) {
-        _config.baseUrl = parsedResource.baseUrl;
-      }
-      if (portalPrefix === undefined) {
-        _config.portalPrefix = parsedResource.portalPrefix;
-      }
-      _config.resourceOwnerUsername = parsedResource.resourceOwnerUsername;
+      _config.resourceBaseUrl = parsedResource.resourceBaseUrl;
+      _config.resourceLogsPrefix = parsedResource.resourceLogsPrefix;
       _config.resourceId = parsedResource.resourceId;
     } else {
-      _config.resourceOwnerUsername = null;
+      _config.resourceBaseUrl = null;
+      _config.resourceLogsPrefix = null;
       _config.resourceId = null;
     }
   }
@@ -222,12 +186,6 @@ function configure(options = {}) {
   }
   if (apiKey !== undefined) {
     _config.apiKey = apiKey;
-  }
-  if (baseUrl !== undefined) {
-    _config.baseUrl = String(baseUrl).replace(/\/$/, '');
-  }
-  if (portalPrefix !== undefined) {
-    _config.portalPrefix = normalizePortalPrefix(portalPrefix);
   }
   if (enabled !== undefined) {
     _config.enabled = Boolean(enabled);
@@ -242,9 +200,6 @@ function configure(options = {}) {
       ? options.cloudLevel
       : options.cloud_level;
     _config.cloudLevel = coerceCloudLevel(cloudLevelValue);
-  } else if (debug === true && _config.cloudLevel !== null) {
-    // In SDK debug mode, prefer forwarding debug-level events unless caller explicitly sets cloudLevel.
-    _config.cloudLevel = LEVEL_NAME_TO_NO.DEBUG;
   }
 
   if (timeoutSeconds !== undefined) {
@@ -253,63 +208,18 @@ function configure(options = {}) {
   if (verifySsl !== undefined) {
     _config.verifySsl = Boolean(verifySsl);
   }
-  if (debug !== undefined) {
-    _config.debug = Boolean(debug);
-  }
-
-  try {
-    const { refreshDebugConsoleHandler } = require('./logger');
-    refreshDebugConsoleHandler();
-  } catch {
-    // Fail-safe: configuration should never raise due to optional helpers.
-  }
-
-  try {
-    const { refreshMcp } = require('./mcp-tools');
-    refreshMcp();
-  } catch {
-    // Fail-safe: configuration should never raise due to optional helpers.
-  }
 }
 
-function resolvedPortalPrefix() {
+function buildResourceLogsEndpoint(resourceId) {
   const cfg = getConfig();
-  if (cfg.portalPrefix !== null && cfg.portalPrefix !== undefined) {
-    return cfg.portalPrefix;
-  }
-
-  try {
-    const parsed = new URL(cfg.baseUrl);
-    const pathPrefix = normalizePortalPrefix(parsed.pathname);
-    if (pathPrefix) {
-      return pathPrefix;
-    }
-
-    const host = (parsed.hostname || '').trim().toLowerCase();
-    if (host === 'alshival.ai' || host === 'www.alshival.ai') {
-      return '/DevTools';
-    }
-    return '';
-  } catch {
-    return '';
-  }
-}
-
-function buildResourceLogsEndpoint(username, resourceId) {
-  const cfg = getConfig();
-
-  let base;
-  try {
-    const parsed = new URL(cfg.baseUrl || DEFAULT_BASE_URL);
-    base = `${parsed.protocol}//${parsed.host}`;
-  } catch {
-    base = DEFAULT_BASE_URL;
-  }
-
-  const portalPrefix = resolvedPortalPrefix();
-  const safeUser = encodeURIComponent(String(username || '').trim());
+  const base = String(cfg.resourceBaseUrl || '').trim().replace(/\/$/, '');
   const safeResource = encodeURIComponent(String(resourceId || '').trim());
-  return `${base}${portalPrefix}/u/${safeUser}/resources/${safeResource}/logs/`;
+  const resourceLogsPrefix = String(cfg.resourceLogsPrefix || '').trim();
+  if (!base || !resourceLogsPrefix) {
+    return '';
+  }
+  const cleanedPrefix = `/${resourceLogsPrefix.replace(/^\/+|\/+$/g, '')}`;
+  return `${base}${cleanedPrefix}/${safeResource}/logs/`;
 }
 
 function setEnabled(enabled) {
@@ -328,11 +238,8 @@ module.exports = {
   coerceLevel,
   coerceCloudLevel,
   configure,
-  envBool,
   envLevel,
   getConfig,
-  normalizePortalPrefix,
   parseResourceReference,
-  resolvedPortalPrefix,
   setEnabled,
 };

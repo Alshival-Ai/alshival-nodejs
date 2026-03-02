@@ -16,12 +16,6 @@ const {
   setTransportForTests,
 } = require('./logger');
 
-const {
-  githubMcpTool,
-  mcp,
-  mcpTool,
-} = require('./mcp-tools');
-
 function getLogger(name, options) {
   return log.getLogger(name, options);
 }
@@ -43,14 +37,9 @@ module.exports = {
   configure,
   getConfig,
   getLogger,
-  githubMcpTool,
   handler,
   log,
-  mcp,
-  mcp_tool: mcpTool,
-  mcpTool,
   parseResourceReference,
   setEnabled,
-  github_mcp_tool: githubMcpTool,
   _setTransportForTests: setTransportForTests,
 };

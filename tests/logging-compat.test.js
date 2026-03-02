@@ -8,16 +8,14 @@ const alshival = require('../src');
 function resetSdkConfig() {
   const cfg = alshival.getConfig();
   cfg.username = null;
-  cfg.resourceOwnerUsername = null;
+  cfg.resourceBaseUrl = null;
+  cfg.resourceLogsPrefix = null;
   cfg.apiKey = null;
-  cfg.baseUrl = 'https://alshival.ai';
-  cfg.portalPrefix = null;
   cfg.resourceId = null;
   cfg.enabled = true;
   cfg.cloudLevel = 20;
   cfg.timeoutSeconds = 5;
   cfg.verifySsl = true;
-  cfg.debug = false;
 }
 
 async function withTransportCapture(fn) {
@@ -174,7 +172,7 @@ test('shared resource uses owner path with actor headers', async () => {
   });
 });
 
-test('cloud send requires username identity', async () => {
+test('cloud send without username uses resource url', async () => {
   alshival.configure({
     username: '',
     apiKey: 'k',
@@ -185,6 +183,9 @@ test('cloud send requires username identity', async () => {
 
   await withTransportCapture(async (calls) => {
     alshival.log.info('shared write without username');
-    assert.equal(calls.length, 0);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].url.includes('/u/owner-user/resources/r/logs/'), true);
+    assert.equal(calls[0].headers['x-api-key'], 'k');
+    assert.equal(Object.prototype.hasOwnProperty.call(calls[0].headers, 'x-user-username'), false);
   });
 });

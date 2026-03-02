@@ -61,15 +61,7 @@ function sdkVersion() {
 }
 
 function debug(msg) {
-  const cfg = getConfig();
-  if (!cfg.debug) {
-    return;
-  }
-  try {
-    process.stderr.write(`[alshival] ${msg}\n`);
-  } catch {
-    // Fail-safe diagnostics only.
-  }
+  return;
 }
 
 function normalizedLevelNo(level) {
@@ -168,8 +160,8 @@ class CloudLogHandler {
     this._inEmit = false;
   }
 
-  resourceEndpoint(username, resourceId) {
-    return buildResourceLogsEndpoint(username, resourceId);
+  resourceEndpoint(resourceId) {
+    return buildResourceLogsEndpoint(resourceId);
   }
 
   shouldForward(record) {
@@ -185,9 +177,6 @@ class CloudLogHandler {
       return false;
     }
     if (!cfg.apiKey) {
-      return false;
-    }
-    if (!cfg.username) {
       return false;
     }
     return true;
@@ -251,8 +240,7 @@ class CloudLogHandler {
         ],
       };
 
-      const resourceOwner = String(cfg.resourceOwnerUsername || cfg.username || '').trim();
-      const endpoint = this.resourceEndpoint(resourceOwner, resolvedResource);
+      const endpoint = this.resourceEndpoint(resolvedResource);
 
       const headers = {
         'x-api-key': cfg.apiKey || '',
@@ -271,7 +259,7 @@ class CloudLogHandler {
         }),
       )
         .then((resp) => {
-          if (cfg.debug && Number(resp && resp.statusCode) >= 400) {
+          if (Number(resp && resp.statusCode) >= 400) {
             debug(`cloud log post failed: status=${resp.statusCode}`);
           }
         })
@@ -305,13 +293,13 @@ class AlshivalLogger {
     return {
       username: cfg.username,
       api_key: cfg.apiKey ? 'set' : 'unset',
-      base_url: cfg.baseUrl,
+      resource_base_url: cfg.resourceBaseUrl,
+      resource_logs_prefix: cfg.resourceLogsPrefix,
       resource_id: cfg.resourceId,
       enabled: cfg.enabled,
       cloud_level: cfg.cloudLevel,
       timeout_seconds: cfg.timeoutSeconds,
       verify_ssl: cfg.verifySsl,
-      debug: cfg.debug,
     };
   }
 
